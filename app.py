@@ -23,92 +23,40 @@ app = Flask(__name__)
 class QuantumFoamRNG_Free:
     """
     Community Edition - Quantum Foam Random Number Generator
-    
-    Features:
-    ✓ Basic quantum foam entropy extraction
-    ✓ Standard Pauli basis measurements
-    ✓ Educational documentation
-    ✓ Suitable for learning and prototyping
-    ✓ Open source - audit the code!
-    
-    Limitations:
-    - Uses 9 basic Pauli bases (slower generation)
-    - No optimization for foam coupling strength
-    - Community support only
-    - No SLA guarantees
-    
-    For production applications requiring:
-    - 10x faster generation (75 optimized bases)
-    - High foam coupling strength (σ > 0.5)
-    - Quantum certificates
-    - Priority support
-    - Enterprise SLA
-    
-    Email: shemshallah@gmail.com for Pro Edition
     """
     
     VERSION = "1.0.0-free"
     
     def __init__(self, device_id="ionq_simulator"):
-        """
-        Initialize Quantum Foam RNG
-        
-        Args:
-            device_id: qBraid device identifier (default: ionq_simulator)
-        """
+        """Initialize Quantum Foam RNG"""
         print(f"🌊 Quantum Foam RNG - Community Edition v{self.VERSION}")
-        print(f"─" * 60)
         
         self.provider = QbraidProvider()
         self.device = self.provider.get_device(device_id)
         
-        # Basic basis set - Standard two-qubit Pauli measurements
-        # Pro Edition uses 75 optimized bases with 10x better foam coupling
+        # Basic basis set
         self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
         
         print(f"✓ Device: {self.device.id}")
-        print(f"✓ Bases: {len(self.bases)} (basic set)")
+        print(f"✓ Bases: {len(self.bases)}")
         print(f"✓ Status: {self.device.status()}")
-        print(f"\n💡 Want 10x faster? Email: hello@quantum-foam-rng.com")
-        print(f"─" * 60)
     
     def generate_entropy(self, n_bits=256, theta=45, verbose=True):
-        """
-        Generate quantum random bits using foam coupling
-        
-        Args:
-            n_bits: Number of random bits to generate (default: 256)
-            theta: Bell state angle in degrees (default: 45 for max entanglement)
-            verbose: Print progress updates (default: True)
-        
-        Returns:
-            dict: {
-                'bits': str,              # Binary string
-                'hex': str,               # Hexadecimal representation
-                'foam_strength': float,   # Measured foam coupling
-                'metadata': dict          # Generation details
-            }
-        
-        Note: This uses basic basis set. Pro Edition generates 10x faster
-        using optimized high-foam-coupling bases discovered through research.
-        """
+        """Generate quantum random bits"""
         
         if verbose:
-            print(f"\n🎲 Generating {n_bits} random bits...")
-            print(f"   Angle: θ={theta}°")
-            print(f"   Bases: {len(self.bases)}")
+            print(f"\n🎲 Generating {n_bits} bits at θ={theta}°")
         
         start_time = datetime.now()
         
-        # Calculate required shots
+        # Calculate shots
         shots_per_basis = int(np.ceil(n_bits / (2 * len(self.bases))))
         
         if verbose:
             print(f"   Shots per basis: {shots_per_basis}")
-            print(f"   Total shots: {shots_per_basis * len(self.bases)}")
-            print(f"\n⏳ Submitting circuits...")
+            print(f"   Submitting {len(self.bases)} circuits...")
         
-        # Submit all jobs
+        # Submit jobs
         jobs = []
         for basis in self.bases:
             circuit = self._create_bell_circuit(theta, basis)
@@ -116,8 +64,7 @@ class QuantumFoamRNG_Free:
             jobs.append((basis, job))
         
         if verbose:
-            print(f"✓ Submitted {len(jobs)} jobs")
-            print(f"\n⏳ Collecting results...")
+            print(f"   Collecting results...")
         
         # Collect results
         all_bits = []
@@ -138,11 +85,10 @@ class QuantumFoamRNG_Free:
                 else:
                     outcome_str = outcome
                 
-                # Get last 2 bits
                 bits = [int(b) for b in outcome_str[-2:]]
                 all_bits.extend(bits * count)
             
-            # Calculate expectation value for foam strength measurement
+            # Expectation value
             total = sum(counts.values())
             n_00 = counts.get('00', 0) + counts.get('0', 0) + counts.get(0, 0)
             n_11 = counts.get('11', 0) + counts.get('3', 0) + counts.get(3, 0)
@@ -153,31 +99,23 @@ class QuantumFoamRNG_Free:
             expectation_values.append(exp_val)
             
             if verbose and (i + 1) % 3 == 0:
-                print(f"   [{i + 1}/{len(jobs)}] collected")
+                print(f"   Progress: {i + 1}/{len(jobs)}")
         
         # Truncate to requested length
         entropy_bits = all_bits[:n_bits]
         bit_string = ''.join(map(str, entropy_bits))
         hex_string = hex(int(bit_string, 2))[2:].zfill(n_bits // 4)
         
-        # Calculate foam strength
+        # Foam strength
         foam_strength = np.std(expectation_values)
         
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
         if verbose:
-            print(f"✓ Collection complete")
-            print(f"\n📊 Results:")
-            print(f"   Bits generated: {len(entropy_bits)}")
+            print(f"✓ Complete!")
             print(f"   Foam strength: σ={foam_strength:.4f}")
-            print(f"   Generation time: {duration:.1f}s")
-            print(f"   Rate: {len(entropy_bits)/duration:.1f} bits/sec")
-            
-            if foam_strength > 0.3:
-                print(f"\n✨ Strong foam coupling detected! (σ > 0.3)")
-            else:
-                print(f"\n💡 Pro Edition achieves σ > 0.5 with optimized bases")
+            print(f"   Time: {duration:.1f}s")
         
         metadata = {
             'version': self.VERSION,
@@ -200,24 +138,10 @@ class QuantumFoamRNG_Free:
         }
     
     def generate_crypto_key(self, verbose=True):
-        """
-        Generate 256-bit cryptographic key
-        
-        Suitable for:
-        - Bitcoin/Ethereum private keys
-        - AES-256 encryption keys
-        - Secure password generation
-        
-        Returns:
-            dict: {
-                'private_key': str,       # 64-character hex string
-                'foam_strength': float,   # Quantum foam coupling measure
-                'timestamp': str
-            }
-        """
+        """Generate 256-bit crypto key"""
         
         if verbose:
-            print(f"\n🔐 Generating cryptographic key (256 bits)...")
+            print(f"\n🔐 Generating crypto key...")
         
         result = self.generate_entropy(n_bits=256, verbose=verbose)
         
@@ -229,29 +153,19 @@ class QuantumFoamRNG_Free:
         }
     
     def _create_bell_circuit(self, theta_deg, basis):
-        """
-        Create Bell state circuit with specified measurement basis
-        
-        Args:
-            theta_deg: Bell state angle in degrees
-            basis: Two-character string specifying measurement basis (e.g., 'ZX')
-        
-        Returns:
-            QuantumCircuit: Qiskit circuit ready for execution
-        """
+        """Create Bell state circuit"""
         qc = QuantumCircuit(2, 2)
         
-        # Prepare Bell state at angle θ
+        # Bell state
         theta_rad = np.radians(theta_deg)
         qc.ry(theta_rad, 0)
         qc.cx(0, 1)
         
-        # Apply basis rotations
+        # Basis rotations
         if basis[0] == 'X':
             qc.ry(-np.pi/2, 0)
         elif basis[0] == 'Y':
             qc.rx(np.pi/2, 0)
-        # Z is default (no rotation)
         
         if basis[1] == 'X':
             qc.ry(-np.pi/2, 1)
@@ -269,25 +183,34 @@ class QuantumFoamRNG_Free:
 
 @app.route('/')
 def home():
-    """Serve landing page"""
-    try:
+    """Serve landing page or API info"""
+    # Try to serve static file
+    if os.path.exists('static/index.html'):
         return send_from_directory('static', 'index.html')
-    except:
-        # Fallback if static files not available
-        return jsonify({
-            'service': 'Quantum Foam RNG API',
-            'version': '1.0.0',
-            'endpoints': {
-                '/health': 'Health check',
-                '/api/v1/generate': 'Generate entropy (POST)',
-                '/api/v1/key': 'Generate crypto key (POST)'
-            },
-            'github': 'https://github.com/shemshallah/quantum-foam-rng'
-        })
+    
+    # Fallback JSON response
+    return jsonify({
+        'service': 'Quantum Foam RNG API',
+        'version': '1.0.0',
+        'status': 'online',
+        'endpoints': {
+            'GET /': 'This page',
+            'GET /health': 'Health check',
+            'GET /api/v1/info': 'API information',
+            'POST /api/v1/generate': 'Generate entropy',
+            'POST /api/v1/key': 'Generate crypto key'
+        },
+        'usage': {
+            'generate_key': 'POST /api/v1/key (no body required)',
+            'generate_entropy': 'POST /api/v1/generate with {"bits": 256, "theta": 45}'
+        },
+        'github': 'https://github.com/shemshallah/quantum-foam-rng',
+        'contact': 'shemshallah@gmail.com'
+    })
 
 @app.route('/health')
 def health():
-    """Health check endpoint"""
+    """Health check"""
     return jsonify({
         'status': 'healthy',
         'service': 'quantum-foam-rng',
@@ -295,121 +218,9 @@ def health():
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/api/v1/generate', methods=['POST'])
-def generate_entropy():
-    """
-    Generate quantum entropy
-    
-    Request Body:
-    {
-        "bits": 256,           // Number of bits (default: 256)
-        "theta": 45,           // Bell state angle (default: 45)
-        "api_key": "optional"  // Pro edition key (optional)
-    }
-    
-    Response:
-    {
-        "success": true,
-        "entropy": "a3f8e21c...",
-        "foam_strength": 0.1847,
-        "metadata": {...}
-    }
-    """
-    try:
-        data = request.get_json() or {}
-        n_bits = data.get('bits', 256)
-        theta = data.get('theta', 45)
-        api_key = data.get('api_key')
-        
-        # Validate inputs
-        if not isinstance(n_bits, int) or n_bits < 1 or n_bits > 2048:
-            return jsonify({
-                'success': False,
-                'error': 'bits must be integer between 1 and 2048'
-            }), 400
-        
-        if not isinstance(theta, (int, float)) or theta < 0 or theta > 90:
-            return jsonify({
-                'success': False,
-                'error': 'theta must be number between 0 and 90'
-            }), 400
-        
-        # Pro edition not implemented in this version
-        if api_key:
-            return jsonify({
-                'success': False,
-                'error': 'Pro edition coming soon. Email: hello@quantum-foam-rng.com'
-            }), 501
-        
-        # Generate using free edition
-        rng = QuantumFoamRNG_Free()
-        result = rng.generate_entropy(n_bits=n_bits, theta=theta, verbose=False)
-        
-        return jsonify({
-            'success': True,
-            'entropy': result['hex'],
-            'foam_strength': result['foam_strength'],
-            'metadata': result['metadata']
-        })
-    
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/v1/key', methods=['POST'])
-def generate_key():
-    """
-    Generate cryptographic key
-    
-    Request Body:
-    {
-        "api_key": "optional"  // Pro edition key (optional)
-    }
-    
-    Response:
-    {
-        "success": true,
-        "private_key": "a3f8e21c...",
-        "foam_strength": 0.1847,
-        "timestamp": "2025-01-15T..."
-    }
-    """
-    try:
-        data = request.get_json() or {}
-        api_key = data.get('api_key')
-        
-        # Pro edition not implemented in this version
-        if api_key:
-            return jsonify({
-                'success': False,
-                'error': 'Pro edition coming soon. Email: hello@quantum-foam-rng.com'
-            }), 501
-        
-        # Generate using free edition
-        rng = QuantumFoamRNG_Free()
-        key = rng.generate_crypto_key(verbose=False)
-        
-        return jsonify({
-            'success': True,
-            'private_key': key['private_key'],
-            'foam_strength': key['foam_strength'],
-            'timestamp': key['timestamp'],
-            'edition': key['edition']
-        })
-    
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/v1/info', methods=['GET'])
+@app.route('/api/v1/info')
 def info():
-    """
-    Get API information
-    """
+    """API info"""
     return jsonify({
         'service': 'Quantum Foam RNG',
         'version': '1.0.0',
@@ -426,12 +237,123 @@ def info():
                 'foam_coupling': '>0.5',
                 'speed': '~1000 bits/min',
                 'support': 'priority',
-                'contact': 'hello@quantum-foam-rng.com'
+                'contact': 'shemshallah@gmail.com'
             }
         },
-        'github': 'https://github.com/shemshallah/quantum-foam-rng',
-        'documentation': 'https://github.com/shemshallah/quantum-foam-rng#readme'
+        'github': 'https://github.com/shemshallah/quantum-foam-rng'
     })
+
+@app.route('/api/v1/generate', methods=['GET', 'POST'])
+def generate_entropy():
+    """
+    Generate quantum entropy
+    
+    POST with JSON body:
+    {
+        "bits": 256,    // optional, default 256
+        "theta": 45     // optional, default 45
+    }
+    
+    OR GET with query params:
+    /api/v1/generate?bits=256&theta=45
+    """
+    try:
+        # Handle both GET and POST
+        if request.method == 'POST':
+            # Try to get JSON, but don't fail if empty
+            try:
+                data = request.get_json(force=True, silent=True) or {}
+            except:
+                data = {}
+        else:  # GET
+            data = request.args.to_dict()
+        
+        # Parse parameters with defaults
+        try:
+            n_bits = int(data.get('bits', 256))
+        except (ValueError, TypeError):
+            n_bits = 256
+        
+        try:
+            theta = float(data.get('theta', 45))
+        except (ValueError, TypeError):
+            theta = 45
+        
+        # Validate
+        if n_bits < 1 or n_bits > 2048:
+            return jsonify({
+                'success': False,
+                'error': 'bits must be between 1 and 2048'
+            }), 400
+        
+        if theta < 0 or theta > 90:
+            return jsonify({
+                'success': False,
+                'error': 'theta must be between 0 and 90'
+            }), 400
+        
+        # Generate
+        print(f"API Request: Generate {n_bits} bits at θ={theta}°")
+        rng = QuantumFoamRNG_Free()
+        result = rng.generate_entropy(n_bits=n_bits, theta=theta, verbose=True)
+        
+        return jsonify({
+            'success': True,
+            'entropy': result['hex'],
+            'foam_strength': result['foam_strength'],
+            'metadata': result['metadata']
+        })
+    
+    except Exception as e:
+        print(f"Error in generate_entropy: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/v1/key', methods=['GET', 'POST'])
+def generate_key():
+    """
+    Generate crypto key
+    
+    No parameters required - always generates 256-bit key
+    Works with GET or POST
+    """
+    try:
+        print(f"API Request: Generate crypto key")
+        
+        rng = QuantumFoamRNG_Free()
+        key = rng.generate_crypto_key(verbose=True)
+        
+        return jsonify({
+            'success': True,
+            'private_key': key['private_key'],
+            'foam_strength': key['foam_strength'],
+            'timestamp': key['timestamp'],
+            'edition': key['edition']
+        })
+    
+    except Exception as e:
+        print(f"Error in generate_key: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.errorhandler(400)
+def bad_request(e):
+    """Handle 400 errors"""
+    return jsonify({
+        'error': 'Bad request',
+        'message': 'The request was malformed or missing required data',
+        'help': 'For /api/v1/key, no body required. For /api/v1/generate, send {"bits": 256, "theta": 45} or use GET with query params'
+    }), 400
 
 @app.errorhandler(404)
 def not_found(e):
@@ -439,11 +361,11 @@ def not_found(e):
     return jsonify({
         'error': 'Endpoint not found',
         'available_endpoints': [
-            '/',
-            '/health',
-            '/api/v1/generate',
-            '/api/v1/key',
-            '/api/v1/info'
+            'GET /',
+            'GET /health',
+            'GET /api/v1/info',
+            'POST /api/v1/generate',
+            'POST /api/v1/key'
         ]
     }), 404
 
@@ -469,7 +391,6 @@ if __name__ == '__main__':
     print(f"{'='*80}")
     print(f"Port: {port}")
     print(f"Debug: {debug}")
-    print(f"Starting...")
     print(f"{'='*80}\n")
     
     app.run(host='0.0.0.0', port=port, debug=debug)

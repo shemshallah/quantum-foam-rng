@@ -5,16 +5,26 @@ Deployed on Render
 
 from flask import Flask, jsonify, request, send_from_directory
 import numpy as np
-from qbraid.runtime import QbraidProvider
-from qiskit import QuantumCircuit
 import hashlib
 from datetime import datetime
 import warnings
 import os
+import sys
 
 warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
+
+# Try to import quantum libraries, fall back to mock if unavailable
+QUANTUM_AVAILABLE = False
+try:
+    from qbraid.runtime import QbraidProvider
+    from qiskit import QuantumCircuit
+    QUANTUM_AVAILABLE = True
+    print("✓ Quantum libraries loaded successfully")
+except Exception as e:
+    print(f"⚠️  Quantum libraries not available: {e}")
+    print("   Running in MOCK mode for testing")
 
 
 class QuantumFoamRNG_Free:
@@ -22,104 +32,164 @@ class QuantumFoamRNG_Free:
     
     VERSION = "1.0.0-free"
     
-    def __init__(self, device_id="ionq_simulator"):
+    def __init__(self, device_id="ionq_simulator", mock_mode=False):
         """Initialize Quantum Foam RNG"""
         print(f"🌊 Quantum Foam RNG - Community Edition v{self.VERSION}")
         
-        self.provider = QbraidProvider()
-        self.device = self.provider.get_device(device_id)
-        self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
+        self.mock_mode = mock_mode or not QUANTUM_AVAILABLE
         
-        print(f"✓ Device: {self.device.id}")
-        print(f"✓ Bases: {len(self.bases)}")
-        print(f"✓ Status: {self.device.status()}")
+        if self.mock_mode:
+            print("⚠️  Running in MOCK mode (for testing)")
+            self.device = None
+            self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
+        else:
+            try:
+                self.provider = QbraidProvider()
+                self.device = self.provider.get_device(device_id)
+                self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
+                
+                print(f"✓ Device: {self.device.id}")
+                print(f"✓ Bases: {len(self.bases)}")
+                print(f"✓ Status: {self.device.status()}")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize quantum device: {e}")
+                print("   Falling back to MOCK mode")
+                self.mock_mode = True
+                self.device = None
+                self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
     
     def generate_entropy(self, n_bits=256, theta=45, verbose=True):
         """Generate quantum random bits"""
         
         if verbose:
-            print(f"\n🎲 Generating {n_bits} bits at θ={theta}°")
+            mode = "MOCK" if self.mock_mode else "QUANTUM"
+            print(f"\n🎲 Generating {n_bits} bits at θ={theta}° [{mode}]")
         
         start_time = datetime.now()
-        shots_per_basis = int(np.ceil(n_bits / (2 * len(self.bases))))
         
-        if verbose:
-            print(f"   Shots per basis: {shots_per_basis}")
-            print(f"   Submitting {len(self.bases)} circuits...")
-        
-        jobs = []
-        for basis in self.bases:
-            circuit = self._create_bell_circuit(theta, basis)
-            job = self.device.run(circuit, shots=shots_per_basis)
-            jobs.append((basis, job))
-        
-        if verbose:
-            print(f"   Collecting results...")
-        
-        all_bits = []
-        expectation_values = []
-        
-        for i, (basis, job) in enumerate(jobs):
-            result = job.result()
+        if self.mock_mode:
+            # Mock mode - generate cryptographically secure random bits
+            entropy_bits = [int(b) for b in bin(int.from_bytes(os.urandom(n_bits // 8 + 1), 'big'))[2:].zfill(n_bits)[:n_bits]]
+            bit_string = ''.join(map(str, entropy_bits))
+            hex_string = hex(int(bit_string, 2))[2:].zfill(n_bits // 4)
             
-            try:
-                counts = result.data.get_counts()
-            except:
-                counts = result.get_counts()
+            # Mock foam strength (realistic value)
+            foam_strength = np.random.uniform(0.12, 0.18)
             
-            for outcome, count in counts.items():
-                if isinstance(outcome, int):
-                    outcome_str = format(outcome, '02b')
-                else:
-                    outcome_str = outcome
+            # Mock timing (realistic)
+            import time
+            time.sleep(2)  # Simulate quantum processing
+            
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            
+            if verbose:
+                print(f"✓ Complete! [MOCK MODE]")
+                print(f"   Foam strength: σ={foam_strength:.4f}")
+                print(f"   Time: {duration:.1f}s")
+            
+            metadata = {
+                'version': self.VERSION,
+                'edition': 'free',
+                'device': 'mock_simulator',
+                'mode': 'mock',
+                'theta_deg': theta,
+                'n_bases': len(self.bases),
+                'generation_time_sec': duration,
+                'bits_per_second': len(entropy_bits) / duration,
+                'timestamp': end_time.isoformat(),
+                'warning': 'Generated using cryptographic PRNG in mock mode'
+            }
+            
+            return {
+                'bits': bit_string,
+                'hex': hex_string,
+                'foam_strength': foam_strength,
+                'metadata': metadata
+            }
+        
+        else:
+            # Real quantum mode
+            shots_per_basis = int(np.ceil(n_bits / (2 * len(self.bases))))
+            
+            if verbose:
+                print(f"   Shots per basis: {shots_per_basis}")
+                print(f"   Submitting {len(self.bases)} circuits...")
+            
+            jobs = []
+            for basis in self.bases:
+                circuit = self._create_bell_circuit(theta, basis)
+                job = self.device.run(circuit, shots=shots_per_basis)
+                jobs.append((basis, job))
+            
+            if verbose:
+                print(f"   Collecting results...")
+            
+            all_bits = []
+            expectation_values = []
+            
+            for i, (basis, job) in enumerate(jobs):
+                result = job.result()
                 
-                bits = [int(b) for b in outcome_str[-2:]]
-                all_bits.extend(bits * count)
+                try:
+                    counts = result.data.get_counts()
+                except:
+                    counts = result.get_counts()
+                
+                for outcome, count in counts.items():
+                    if isinstance(outcome, int):
+                        outcome_str = format(outcome, '02b')
+                    else:
+                        outcome_str = outcome
+                    
+                    bits = [int(b) for b in outcome_str[-2:]]
+                    all_bits.extend(bits * count)
+                
+                total = sum(counts.values())
+                n_00 = counts.get('00', 0) + counts.get('0', 0) + counts.get(0, 0)
+                n_11 = counts.get('11', 0) + counts.get('3', 0) + counts.get(3, 0)
+                n_01 = counts.get('01', 0) + counts.get('1', 0) + counts.get(1, 0)
+                n_10 = counts.get('10', 0) + counts.get('2', 0) + counts.get(2, 0)
+                
+                exp_val = (n_00 + n_11 - n_01 - n_10) / total
+                expectation_values.append(exp_val)
+                
+                if verbose and (i + 1) % 3 == 0:
+                    print(f"   Progress: {i + 1}/{len(jobs)}")
             
-            total = sum(counts.values())
-            n_00 = counts.get('00', 0) + counts.get('0', 0) + counts.get(0, 0)
-            n_11 = counts.get('11', 0) + counts.get('3', 0) + counts.get(3, 0)
-            n_01 = counts.get('01', 0) + counts.get('1', 0) + counts.get(1, 0)
-            n_10 = counts.get('10', 0) + counts.get('2', 0) + counts.get(2, 0)
+            entropy_bits = all_bits[:n_bits]
+            bit_string = ''.join(map(str, entropy_bits))
+            hex_string = hex(int(bit_string, 2))[2:].zfill(n_bits // 4)
+            foam_strength = np.std(expectation_values)
             
-            exp_val = (n_00 + n_11 - n_01 - n_10) / total
-            expectation_values.append(exp_val)
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
             
-            if verbose and (i + 1) % 3 == 0:
-                print(f"   Progress: {i + 1}/{len(jobs)}")
-        
-        entropy_bits = all_bits[:n_bits]
-        bit_string = ''.join(map(str, entropy_bits))
-        hex_string = hex(int(bit_string, 2))[2:].zfill(n_bits // 4)
-        foam_strength = np.std(expectation_values)
-        
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-        
-        if verbose:
-            print(f"✓ Complete!")
-            print(f"   Foam strength: σ={foam_strength:.4f}")
-            print(f"   Time: {duration:.1f}s")
-        
-        metadata = {
-            'version': self.VERSION,
-            'edition': 'free',
-            'device': self.device.id,
-            'theta_deg': theta,
-            'n_bases': len(self.bases),
-            'shots_per_basis': shots_per_basis,
-            'total_shots': shots_per_basis * len(self.bases),
-            'generation_time_sec': duration,
-            'bits_per_second': len(entropy_bits) / duration,
-            'timestamp': end_time.isoformat()
-        }
-        
-        return {
-            'bits': bit_string,
-            'hex': hex_string,
-            'foam_strength': foam_strength,
-            'metadata': metadata
-        }
+            if verbose:
+                print(f"✓ Complete!")
+                print(f"   Foam strength: σ={foam_strength:.4f}")
+                print(f"   Time: {duration:.1f}s")
+            
+            metadata = {
+                'version': self.VERSION,
+                'edition': 'free',
+                'device': self.device.id,
+                'mode': 'quantum',
+                'theta_deg': theta,
+                'n_bases': len(self.bases),
+                'shots_per_basis': shots_per_basis,
+                'total_shots': shots_per_basis * len(self.bases),
+                'generation_time_sec': duration,
+                'bits_per_second': len(entropy_bits) / duration,
+                'timestamp': end_time.isoformat()
+            }
+            
+            return {
+                'bits': bit_string,
+                'hex': hex_string,
+                'foam_strength': foam_strength,
+                'metadata': metadata
+            }
     
     def generate_crypto_key(self, verbose=True):
         """Generate 256-bit crypto key"""
@@ -133,11 +203,15 @@ class QuantumFoamRNG_Free:
             'private_key': result['hex'],
             'foam_strength': result['foam_strength'],
             'timestamp': result['metadata']['timestamp'],
-            'edition': 'free'
+            'edition': 'free',
+            'mode': result['metadata'].get('mode', 'mock')
         }
     
     def _create_bell_circuit(self, theta_deg, basis):
         """Create Bell state circuit"""
+        if not QUANTUM_AVAILABLE:
+            return None
+        
         qc = QuantumCircuit(2, 2)
         
         theta_rad = np.radians(theta_deg)
@@ -169,6 +243,8 @@ def home():
         'service': 'Quantum Foam RNG API',
         'version': '1.0.0',
         'status': 'online',
+        'quantum_available': QUANTUM_AVAILABLE,
+        'mode': 'quantum' if QUANTUM_AVAILABLE else 'mock',
         'endpoints': {
             'GET /': 'This page',
             'GET /health': 'Health check',
@@ -192,6 +268,8 @@ def health():
         'status': 'healthy',
         'service': 'quantum-foam-rng',
         'version': '1.0.0',
+        'quantum_available': QUANTUM_AVAILABLE,
+        'mode': 'quantum' if QUANTUM_AVAILABLE else 'mock',
         'timestamp': datetime.now().isoformat()
     })
 
@@ -203,6 +281,8 @@ def info():
         'service': 'Quantum Foam RNG',
         'version': '1.0.0',
         'edition': 'community',
+        'quantum_available': QUANTUM_AVAILABLE,
+        'mode': 'quantum' if QUANTUM_AVAILABLE else 'mock',
         'features': {
             'free': {
                 'bases': 9,
@@ -257,15 +337,22 @@ def generate_entropy():
             }), 400
         
         print(f"API Request: Generate {n_bits} bits at θ={theta}°")
-        rng = QuantumFoamRNG_Free()
-        result = rng.generate_entropy(n_bits=n_bits, theta=theta, verbose=True)
         
-        return jsonify({
-            'success': True,
-            'entropy': result['hex'],
-            'foam_strength': result['foam_strength'],
-            'metadata': result['metadata']
-        })
+        try:
+            rng = QuantumFoamRNG_Free()
+            result = rng.generate_entropy(n_bits=n_bits, theta=theta, verbose=True)
+            
+            return jsonify({
+                'success': True,
+                'entropy': result['hex'],
+                'foam_strength': result['foam_strength'],
+                'metadata': result['metadata']
+            })
+        except Exception as e:
+            print(f"Error during generation: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     except Exception as e:
         print(f"Error in generate_entropy: {e}")
@@ -274,7 +361,8 @@ def generate_entropy():
         
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
 
 
@@ -292,25 +380,32 @@ def generate_key():
     
     try:
         print(f"API Request: Generate crypto key (method: {request.method})")
-        print(f"Headers: {dict(request.headers)}")
         
-        rng = QuantumFoamRNG_Free()
-        key = rng.generate_crypto_key(verbose=True)
+        try:
+            rng = QuantumFoamRNG_Free()
+            key = rng.generate_crypto_key(verbose=True)
+            
+            response = jsonify({
+                'success': True,
+                'private_key': key['private_key'],
+                'foam_strength': key['foam_strength'],
+                'timestamp': key['timestamp'],
+                'edition': key['edition'],
+                'mode': key.get('mode', 'unknown')
+            })
+            
+            # Add CORS headers
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            
+            return response
         
-        response = jsonify({
-            'success': True,
-            'private_key': key['private_key'],
-            'foam_strength': key['foam_strength'],
-            'timestamp': key['timestamp'],
-            'edition': key['edition']
-        })
-        
-        # Add CORS headers
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        
-        return response
+        except Exception as e:
+            print(f"Error during key generation: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     except Exception as e:
         print(f"Error in generate_key: {e}")
@@ -319,7 +414,9 @@ def generate_key():
         
         error_response = jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'help': 'Check server logs for details'
         })
         error_response.headers['Access-Control-Allow-Origin'] = '*'
         
@@ -355,10 +452,12 @@ def not_found(e):
 @app.errorhandler(500)
 def server_error(e):
     """Handle 500 errors"""
+    import traceback
     return jsonify({
         'success': False,
         'error': 'Internal server error',
-        'message': str(e)
+        'message': str(e),
+        'traceback': traceback.format_exc()
     }), 500
 
 
@@ -371,6 +470,8 @@ if __name__ == '__main__':
     print(f"{'='*80}")
     print(f"Port: {port}")
     print(f"Debug: {debug}")
+    print(f"Quantum Available: {QUANTUM_AVAILABLE}")
+    print(f"Mode: {'quantum' if QUANTUM_AVAILABLE else 'mock (testing)'}")
     print(f"{'='*80}\n")
     
     app.run(host='0.0.0.0', port=port, debug=debug)

@@ -393,7 +393,7 @@ if __name__ == '__main__':
     print(f"Debug: {debug}")
     print(f"{'='*80}\n")
     
-    app.run(host='0.0.0.0', port=port, debug=d        # Basic basis set
+    app.run(host='0.0.0.0', port=port, debug=debug)        # Basic basis set
         self.bases = ['ZZ', 'XX', 'YY', 'ZX', 'XZ', 'ZY', 'YZ', 'XY', 'YX']
         
         print(f"✓ Device: {self.device.id}")

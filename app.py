@@ -1,4 +1,3 @@
-
 """
 Quantum Foam RNG API
 Deployed on Render
@@ -279,40 +278,61 @@ def generate_entropy():
         }), 500
 
 
-@app.route('/api/v1/key', methods=['GET', 'POST'])
+@app.route('/api/v1/key', methods=['GET', 'POST', 'OPTIONS'])
 def generate_key():
-    """Generate crypto key - works with GET or POST"""
+    """Generate crypto key - works with GET, POST, and handles CORS"""
+    
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+    
     try:
         print(f"API Request: Generate crypto key (method: {request.method})")
+        print(f"Headers: {dict(request.headers)}")
         
         rng = QuantumFoamRNG_Free()
         key = rng.generate_crypto_key(verbose=True)
         
-        return jsonify({
+        response = jsonify({
             'success': True,
             'private_key': key['private_key'],
             'foam_strength': key['foam_strength'],
             'timestamp': key['timestamp'],
             'edition': key['edition']
         })
+        
+        # Add CORS headers
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        
+        return response
     
     except Exception as e:
         print(f"Error in generate_key: {e}")
         import traceback
         traceback.print_exc()
         
-        return jsonify({
+        error_response = jsonify({
             'success': False,
             'error': str(e)
-        }), 500
+        })
+        error_response.headers['Access-Control-Allow-Origin'] = '*'
+        
+        return error_response, 500
 
 
 @app.errorhandler(400)
 def bad_request(e):
     """Handle 400 errors"""
     return jsonify({
+        'success': False,
         'error': 'Bad request',
-        'message': 'The request was malformed',
+        'message': str(e),
         'help': 'Use GET /api/v1/key (no parameters needed)'
     }), 400
 
@@ -336,6 +356,7 @@ def not_found(e):
 def server_error(e):
     """Handle 500 errors"""
     return jsonify({
+        'success': False,
         'error': 'Internal server error',
         'message': str(e)
     }), 500
@@ -353,4 +374,3 @@ if __name__ == '__main__':
     print(f"{'='*80}\n")
     
     app.run(host='0.0.0.0', port=port, debug=debug)
-

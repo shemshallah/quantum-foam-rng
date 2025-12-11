@@ -1,4 +1,4 @@
-7"""
+"""
 Quantum Foam RNG API - OPTIMIZED with Parallel Processing
 Deployed on Render - IonQ Quantum Simulator
 Uses async job queue + parallel circuit execution for 3-5x speedup
